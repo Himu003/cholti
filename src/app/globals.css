@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-cream: #FBF7EF;
+  --color-paper: #FFFDF9;
+  --color-sand: #F4F2EC;
+  --color-clay: #BC4621;
+  --color-clay-dark: #96351A;
+  --color-clay-light: #FDEEDE;
+  --color-forest: #07382F;
+  --color-forest-2: #075b4f;
+  --color-forest-deep: #043b34;
+  --color-gold: #C99B55;
+  --color-gold-soft: #FAEAD0;
+  --color-ink: #2B2320;
+  --color-muted: #767676;
+  --color-line: #E8E1D6;
+  --font-serif: "Fraunces", "Playfair Display", "Noto Serif Bengali", serif;
+  --font-sans: "Albert Sans", "Hind Siliguri", "Noto Sans Bengali", system-ui, sans-serif;
+}
+
+html.dark {
+  --color-cream: #111111;
+  --color-paper: #111111;
+  --color-sand: #111111;
+  --color-ink: #f3ead9;
+  --color-muted: #a89c88;
+  --color-line: #2b2b2b;
+  --cream: #111111;
+  --paper: #111111;
+  --sand: #111111;
+  --ink: #f3ead9;
+  --muted: #a89c88;
+  --line: #2b2b2b;
+  color-scheme: dark;
+}
+
+.dark main img {
+  filter: brightness(0.93);
+}
+
+:root {
+  --cream: #FBF7EF;
+  --paper: #FFFDF9;
+  --sand: #F4F2EC;
+  --clay: #BC4621;
+  --clay-dark: #96351A;
+  --forest: #07382F;
+  --gold: #C99B55;
+  --ink: #2B2320;
+  --muted: #767676;
+  --line: #E8E1D6;
+  --shadow-warm: 0 18px 50px rgba(62, 32, 12, 0.10);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  background-image: radial-gradient(rgba(62,32,12,0.035) 1px, transparent 1px);
+  background-size: 22px 22px;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--clay); color: #fff; }
+
+.eyebrow {
+  font-size: 16px; letter-spacing: 2.6px; text-transform: uppercase;
+  color: var(--gold); font-weight: 800;
+}
+.gold-divider { width: 40px; height: 2px; background: var(--gold); margin: 14px 0; }
+.gold-divider.center { margin: 14px auto; }
+.stars { color: var(--gold); letter-spacing: 2px; }
+.italic-accent { font-style: italic; color: var(--clay); }
+
+@media (max-width: 767px) {
+  .hero-zoom-frame { height: 150px; overflow: hidden; }
+  .hero-zoom { width: 200%; transform: scale(0.5); transform-origin: top left; }
+}
+
+@keyframes tj-ripple {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  100% { transform: scale(1.25); opacity: 0; }
+}
+@keyframes marquee-x { to { transform: translateX(-50%); } }
+.marquee-track { animation: marquee-x 30s linear infinite; }
+.marquee:hover .marquee-track { animation-play-state: paused; }
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+}
+
+:where(button:not(:disabled), [role="button"]:not([aria-disabled="true"])) {
+  cursor: pointer;
+}

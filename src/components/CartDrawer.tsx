@@ -1,0 +1,256 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { X, MessageCircle, ShoppingBag, UserRound } from "lucide-react";
+import Image from "next/image";
+import { collection, doc, setDoc, getDoc } from "firebase/firestore";
+import { clientDb } from "@/lib/firebase-client";
+import { useAuth, publicUserId } from "@/lib/auth-context";
+import { useShop } from "@/lib/store";
+import { useLang } from "@/lib/lang";
+import { useSettings, zoneLabel } from "@/lib/settings-context";
+import { CheckoutSchema, buildOrderMessage, waOrderLink } from "@/lib/whatsapp";
+
+export default function CartDrawer() {
+  const { t, lang } = useLang();
+  const { user } = useAuth();
+  const router = useRouter();
+  const { cart, updateQty, removeItem, clearCart, cartOpen, setCartOpen } = useShop();
+  const settings = useSettings();
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [area, setArea] = useState("inside-dhaka");
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [placedId, setPlacedId] = useState<string | null>(null);
+  const [needLogin, setNeedLogin] = useState(false);
+
+  useEffect(() => {
+    if (cart.length) setPlacedId(null);
+  }, [cart.length]);
+
+  useEffect(() => {
+    if (user) setNeedLogin(false);
+  }, [user]);
+
+  const zones = settings.zones?.length ? settings.zones : [];
+  const zone = zones.find((z) => z.id === area) ?? zones[0];
+
+  const { sub, del, total } = useMemo(() => {
+    const s = cart.reduce((a, c) => a + c.now * c.qty, 0);
+    const d = cart.length && zone ? zone.charge : 0;
+    return { sub: s, del: d, total: s + d };
+  }, [cart, zone]);
+
+  useEffect(() => {
+    if (!cartOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setCartOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [cartOpen, setCartOpen]);
+
+  useEffect(() => {
+    if (!cartOpen || !user) return;
+    const fillName = !name;
+    const fillPhone = !phone;
+    const fillAddr = !address;
+    if (!fillName && !fillPhone && !fillAddr) return;
+    let live = true;
+    getDoc(doc(clientDb, "users", user.uid))
+      .then((s) => {
+        if (!live) return;
+        const d = s.data();
+        const arr = Array.isArray(d?.addresses) ? d.addresses : [];
+        const pick = arr.find((a) => a && a.id === d?.default_address) ?? arr[0];
+        if (!pick) return;
+        if (fillName && pick.name) setName(String(pick.name));
+        if (fillPhone && pick.phone) setPhone(String(pick.phone));
+        if (fillAddr && pick.address) setAddress(String(pick.address));
+        if (typeof pick.area === "string" && pick.area) {
+          const z = zones.find((x) => x.id === pick.area) ?? zones.find((x) => String(x.charge) === pick.area) ?? zones[0];
+          if (z) setArea(z.id);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [cartOpen, user, zones]);
+
+  const saveOrder = async (parsed: { name: string; phone: string; address: string }) => {
+    const at = new Date().toISOString();
+    const siteRef = doc(collection(clientDb, "orders"));
+    const userOrderRef = user ? doc(collection(clientDb, "users", user.uid, "orders")) : null;
+    await setDoc(siteRef, {
+      items: cart.map((c) => ({ slug: c.slug, name: c.name, fabric: c.fabric, qty: c.qty, now: c.now, img: c.img })),
+      subtotal: sub,
+      delivery: del,
+      total,
+      name: parsed.name,
+      phone: parsed.phone,
+      address: parsed.address,
+      area,
+      area_label: zone ? zoneLabel(zone, lang) : "",
+      uid: user?.uid ?? "",
+      email: user?.email ?? "",
+      user_id: user ? publicUserId(user.uid) : "",
+      photo: user?.photoURL ?? "",
+      user_order_id: userOrderRef?.id ?? "",
+      status: "new",
+      source: "site",
+      created_at: at,
+    });
+    if (user && userOrderRef) {
+      setDoc(userOrderRef, {
+        items: cart.map((c) => ({ slug: c.slug, name: c.name, fabric: c.fabric, qty: c.qty, now: c.now })),
+        subtotal: sub,
+        delivery: del,
+        total,
+        name: parsed.name,
+        phone: parsed.phone,
+        address: parsed.address,
+        status: "pending",
+        site_order_id: siteRef.id,
+        created_at: at,
+      }).catch(() => {});
+      [...new Set(cart.map((c) => c.slug))].forEach((slug) => {
+        setDoc(doc(clientDb, "users", user.uid, "purchased", slug), { at }, { merge: true }).catch(() => {});
+      });
+    }
+    return siteRef.id;
+  };
+
+  const confirm = () => {
+    const parsed = CheckoutSchema.safeParse({ name, phone, address, area });
+    if (!parsed.success) {
+      setErr(parsed.error.issues[0]?.message ?? "Form thik koro");
+      return;
+    }
+    if (!cart.length) {
+      setErr("Cart khali ase");
+      return;
+    }
+    setErr(null);
+    const msg = buildOrderMessage(cart, parsed.data, sub, del, total, zone ? zoneLabel(zone, lang) : "");
+    clearCart();
+    window.open(waOrderLink(settings.wa_number, msg), "_blank", "noopener,noreferrer");
+  };
+
+  const orderNow = async () => {
+    if (!user) {
+      setNeedLogin(true);
+      return;
+    }
+    const parsed = CheckoutSchema.safeParse({ name, phone, address, area });
+    if (!parsed.success) {
+      setErr(parsed.error.issues[0]?.message ?? "Form thik koro");
+      return;
+    }
+    if (!cart.length) {
+      setErr("Cart khali ase");
+      return;
+    }
+    setErr(null);
+    setBusy(true);
+    try {
+      const id = await saveOrder(parsed.data);
+      clearCart();
+      setPlacedId(id);
+    } catch {
+      setErr(t.uploadFailed);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={`${cartOpen ? "" : "pointer-events-none"}`} aria-hidden={!cartOpen} inert={!cartOpen}>
+      <div
+        onClick={() => setCartOpen(false)}
+        className={`fixed inset-0 bg-[#2B2320]/45 z-[80] transition-opacity duration-300 ${cartOpen ? "opacity-100" : "opacity-0"}`}
+      />
+      <aside className={`fixed top-0 right-0 h-dvh w-[min(420px,94vw)] bg-paper z-[90] rounded-l-[20px] border-l border-line flex flex-col transition-transform duration-300 ease-out ${cartOpen ? "translate-x-0" : "translate-x-full"}`}>
+        <div className="p-[18px] border-b border-line flex justify-between items-center">
+          <b className="font-serif text-lg">{t.checkout}</b>
+          <button onClick={() => setCartOpen(false)} className="w-[42px] h-[42px] rounded-full bg-paper border border-line grid place-items-center" aria-label="Close"><X size={17} /></button>
+        </div>
+        <div className="p-[18px] overflow-auto flex-1 flex flex-col gap-3.5">
+          {!cart.length ? <p className="text-center text-muted text-lg py-5">{t.cartEmpty}</p> :
+            cart.map((c, i) => (
+              <div key={i} className="flex gap-3 items-center border border-line rounded-[14px] p-2.5 bg-paper">
+                <Image src={c.img} alt={c.name} width={64} height={64} className="w-16 h-16 rounded-xl object-cover" />
+                <div className="flex-1">
+                  <b className="text-base block leading-snug text-ink">{c.name}</b>
+                  <small className="text-muted">{c.fabric}</small>
+                  <div className="flex justify-between items-center mt-1.5">
+                    <span className="flex items-center gap-2 border border-line rounded-full px-2 py-1">
+                      <button onClick={() => updateQty(i, -1)} className="w-[26px] h-[26px] rounded-full border border-line bg-sand" aria-label="dec">−</button><b>{c.qty}</b><button onClick={() => updateQty(i, 1)} className="w-[26px] h-[26px] rounded-full border border-line bg-sand" aria-label="inc">+</button>
+                    </span>
+                    <b className="text-clay text-[17px]">{(c.now * c.qty).toLocaleString()}৳</b>
+                  </div>
+                </div>
+                <button onClick={() => removeItem(i)} aria-label="remove" className="w-8 h-8 rounded-full border border-line grid place-items-center"><X size={14} /></button>
+              </div>
+            ))}
+          <div><label className="text-base font-bold block mb-1.5">{t.name}</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Fatema Akter" maxLength={60} className="w-full h-[42px] border border-line bg-sand rounded-xl px-3.5 text-lg outline-none" /></div>
+          <div><label className="text-base font-bold block mb-1.5">{t.phone}</label><input value={phone} onChange={(e) => setPhone(e.target.value.replace(/[^\d]/g, "").slice(0, 11))} placeholder="01XXXXXXXXX" inputMode="numeric" className="w-full h-[42px] border border-line bg-sand rounded-xl px-3.5 text-lg outline-none" /></div>
+          <div><label className="text-base font-bold block mb-1.5">{t.address}</label><textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} maxLength={300} placeholder="Basa, road, area, thana, zilla" className="w-full border border-line bg-sand rounded-xl p-2.5 text-lg outline-none" /></div>
+          <div><label className="text-base font-bold block mb-1.5">{t.delivery}</label><select value={zone?.id ?? ""} onChange={(e) => setArea(e.target.value)} className="w-full h-[42px] border border-line bg-sand rounded-xl px-3.5 text-lg">{zones.map((z) => <option key={z.id} value={z.id}>{zoneLabel(z, lang)}</option>)}</select></div>
+          {err && <p className="text-[17px] text-clay font-bold">{err}</p>}
+        </div>
+        <div className="p-[18px] border-t border-line">
+          <div className="flex justify-between text-lg"><span>{t.subtotal}</span><span>{sub.toLocaleString()}৳</span></div>
+          <div className="flex justify-between text-lg"><span>{t.delivery}</span><span>{del.toLocaleString()}৳</span></div>
+          <div className="flex justify-between text-[17px] font-extrabold text-clay"><span>{t.total}</span><span>{total.toLocaleString()}৳</span></div>
+          {placedId ? (
+            <div className="rounded-2xl border border-forest/30 bg-forest/5 p-4 mt-2.5 text-center">
+              <b className="text-[18px] text-forest block">{t.orderPlaced}</b>
+              <p className="text-[15px] text-muted mt-1">{t.orderPlacedSub}</p>
+              <p className="text-[14px] text-muted mt-1">{t.orderIdLabel}: <code className="font-bold">{placedId.slice(0, 8).toUpperCase()}</code></p>
+              <button onClick={() => { setPlacedId(null); setCartOpen(false); }} className="mt-2.5 inline-flex bg-forest text-white rounded-[35px] px-6 py-2 text-[16px] font-bold">{t.shop}</button>
+            </div>
+          ) : needLogin && !user ? (
+            <>
+              <div className="rounded-2xl border border-gold/50 bg-gold-soft/50 p-4 mt-2.5 text-center relative">
+                <button
+                  onClick={() => setNeedLogin(false)}
+                  aria-label="Dismiss"
+                  className="absolute top-2 right-2 w-8 h-8 grid place-items-center rounded-full border border-line bg-paper"
+                >
+                  <X size={14} />
+                </button>
+                <span className="mx-auto w-11 h-11 rounded-full bg-forest text-gold grid place-items-center">
+                  <UserRound size={20} />
+                </span>
+                <b className="text-[18px] block mt-2">{t.needLoginTitle}</b>
+                <p className="text-[15px] text-muted mt-1">{t.needLoginSub}</p>
+                <button
+                  onClick={() => { setCartOpen(false); router.push("/login"); }}
+                  className="mt-2.5 w-full inline-flex justify-center items-center gap-2 bg-clay text-white rounded-[35px] py-3 text-[17px] font-bold hover:bg-clay-dark"
+                >
+                  {t.needLoginBtn}
+                </button>
+              </div>
+              <button onClick={confirm} className="w-full inline-flex justify-center items-center gap-2 bg-paper border border-line rounded-[35px] px-4 py-2.5 text-[16px] font-bold mt-2"><MessageCircle size={14} />{t.confirm}</button>
+            </>
+          ) : (
+            <>
+              <button onClick={orderNow} disabled={busy || !cart.length} className="w-full inline-flex justify-center items-center gap-2 bg-forest text-white rounded-[35px] py-3 text-[17px] font-bold mt-2.5 hover:opacity-90 disabled:opacity-50"><ShoppingBag size={15} />{busy ? "..." : t.orderNow}</button>
+              <button onClick={confirm} className="w-full inline-flex justify-center items-center gap-2 bg-clay text-white rounded-[35px] py-3 text-[17px] font-bold mt-2 hover:bg-clay-dark"><MessageCircle size={15} />{t.confirm}</button>
+            </>
+          )}
+          <p className="text-[15px] text-muted text-center mt-1">{t.codNote}</p>
+        </div>
+      </aside>
+    </div>
+  );
+}
