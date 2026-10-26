@@ -1,14 +1,16 @@
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
 import { BANNER_SLIDES, HERO_STYLE, type BannerSlide, type HeroStyle } from "./hero";
 import { ttlCache } from "./ttl-cache";
 
+type Firestore = import("firebase-admin/firestore").Firestore;
+
 const UPLOADS_BASE = process.env.ADMIN_PUBLIC_URL ?? "http://localhost:3001";
 
-let cached: ReturnType<typeof getFirestore> | null = null;
+let cached: Firestore | null = null;
 
-function fsdb() {
+async function fsdb(): Promise<Firestore> {
   if (!cached) {
+    const { initializeApp, getApps, cert } = await import("firebase-admin/app");
+    const { getFirestore } = await import("firebase-admin/firestore");
     if (!getApps().length) {
       const inline = process.env.FIREBASE_SERVICE_ACCOUNT;
       const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -64,7 +66,7 @@ function inWindow(starts: unknown, ends: unknown, t: string) {
 export async function getHero(): Promise<HeroPayload> {
   return ttlCache("hero", 60_000, async () => {
   try {
-    const db = fsdb();
+    const db = await fsdb();
     const [cfg, snap] = await Promise.all([
       db.doc("hero_config/main").get(),
       db.collection("hero_slides").where("active", "==", 1).get(),

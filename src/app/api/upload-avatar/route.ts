@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   if (!token) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
   let uid = "";
   try {
-    uid = (await adminAuth().verifyIdToken(token)).uid;
+    uid = (await (await adminAuth()).verifyIdToken(token)).uid;
   } catch {
     return NextResponse.json({ error: "Not authorized" }, { status: 401 });
   }

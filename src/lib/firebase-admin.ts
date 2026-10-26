@@ -1,8 +1,8 @@
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
+type Firestore = import("firebase-admin/firestore").Firestore;
+type Auth = import("firebase-admin/auth").Auth;
 
-function init() {
+async function init() {
+  const { initializeApp, getApps, cert } = await import("firebase-admin/app");
   if (!getApps().length) {
     const inline = process.env.FIREBASE_SERVICE_ACCOUNT;
     const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -12,15 +12,19 @@ function init() {
   }
 }
 
-let cached: ReturnType<typeof getFirestore> | null = null;
+let cached: Firestore | null = null;
 
-export function adminDb() {
-  init();
-  if (!cached) cached = getFirestore();
+export async function adminDb(): Promise<Firestore> {
+  if (!cached) {
+    await init();
+    const { getFirestore } = await import("firebase-admin/firestore");
+    cached = getFirestore();
+  }
   return cached;
 }
 
-export function adminAuth() {
-  init();
+export async function adminAuth(): Promise<Auth> {
+  await init();
+  const { getAuth } = await import("firebase-admin/auth");
   return getAuth();
 }

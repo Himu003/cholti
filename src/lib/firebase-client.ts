@@ -12,8 +12,14 @@ const config = {
   appId: "1:656524477508:web:01cac1dde2733ddb61a811",
 };
 
-const app = getApps().length ? getApps()[0] : initializeApp(config);
+const isBrowser = typeof window !== "undefined";
 
-export const clientAuth = getAuth(app);
-export const clientDb = getFirestore(app);
-export const clientStorage = getStorage(app);
+const app = isBrowser
+  ? getApps().length
+    ? getApps()[0]
+    : initializeApp(config)
+  : undefined;
+
+export const clientAuth = (isBrowser ? getAuth(app!) : undefined) as ReturnType<typeof getAuth>;
+export const clientDb = (isBrowser ? getFirestore(app!) : undefined) as ReturnType<typeof getFirestore>;
+export const clientStorage = (isBrowser ? getStorage(app!) : undefined) as ReturnType<typeof getStorage>;

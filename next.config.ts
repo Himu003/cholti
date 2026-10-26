@@ -25,6 +25,14 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   serverExternalPackages: ["jose", "jwks-rsa"],
+  turbopack: {
+    resolveAlias: {
+      "firebase-admin/app": "./src/lib/firebase-admin-worker-stub.ts",
+      "firebase-admin/firestore": "./src/lib/firebase-admin-worker-stub.ts",
+      "firebase-admin/auth": "./src/lib/firebase-admin-worker-stub.ts",
+      "firebase/firestore": "firebase/firestore/lite",
+    },
+  },
   allowedDevOrigins: [
     "3000-cs-100214279862-default.cs-asia-southeast1-yelo.cloudshell.dev",
     "awvzr-136-85-106-86.run.pinggy-free.link",

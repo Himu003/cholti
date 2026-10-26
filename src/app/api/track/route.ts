@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "bad request" }, { status: 400 });
   }
   try {
-    await adminDb().collection("page_views").add({ path, sid, ts: new Date().toISOString() });
+    await (await adminDb()).collection("page_views").add({ path, sid, ts: new Date().toISOString() });
   } catch {
     return NextResponse.json({ error: "store failed" }, { status: 500 });
   }

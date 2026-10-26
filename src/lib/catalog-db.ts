@@ -1,14 +1,16 @@
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
 import { PRODUCTS, CATEGORIES, REVIEWS, type Product } from "./data";
 import { ttlCache } from "./ttl-cache";
 
+type Firestore = import("firebase-admin/firestore").Firestore;
+
 const UPLOADS_BASE = process.env.ADMIN_PUBLIC_URL ?? "http://localhost:3001";
 
-let cached: ReturnType<typeof getFirestore> | null = null;
+let cached: Firestore | null = null;
 
-function fsdb() {
+async function fsdb(): Promise<Firestore> {
   if (!cached) {
+    const { initializeApp, getApps, cert } = await import("firebase-admin/app");
+    const { getFirestore } = await import("firebase-admin/firestore");
     if (!getApps().length) {
       const inline = process.env.FIREBASE_SERVICE_ACCOUNT;
       const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -92,7 +94,7 @@ function toReview(v: FirebaseFirestore.DocumentData): ShopReview {
 
 async function activeDocs(collection: string) {
   return ttlCache(`active:${collection}`, 60_000, async () => {
-    const snap = await fsdb().collection(collection).where("active", "==", 1).get();
+    const snap = await (await fsdb()).collection(collection).where("active", "==", 1).get();
     return snap.docs
       .map((d) => ({ order: Number(d.data().sort_order ?? 0), doc: d }))
       .sort((a, b) => a.order - b.order)
@@ -171,7 +173,7 @@ const FALLBACK_SIZES: Record<string, string[]> = {
 async function optionOn(kind: "fabrics" | "sizes" | "colors"): Promise<boolean> {
   return ttlCache(`options:vis:${kind}`, 60_000, async () => {
     try {
-      const snap = await fsdb().doc("config/options").get();
+      const snap = await (await fsdb()).doc("config/options").get();
       return (snap.data() ?? {})[kind] !== false;
     } catch {
       return true;

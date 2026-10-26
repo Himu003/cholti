@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     const faqs = await ttlCache("faqs", 60_000, async () => {
-      const snap = await adminDb().collection("faqs").where("active", "==", 1).get();
+      const snap = await (await adminDb()).collection("faqs").where("active", "==", 1).get();
       return snap.docs
       .map((d) => {
         const v = d.data();

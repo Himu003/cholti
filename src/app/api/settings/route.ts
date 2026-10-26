@@ -27,7 +27,7 @@ export async function GET() {
     ttlCache("settings", 60_000, async () => {
       const out = { ...DEFAULTS };
       try {
-        const db = adminDb();
+        const db = await adminDb();
         await Promise.all(
           Object.keys(DEFAULTS).map(async (key) => {
             const snap = await db.doc(`settings/${key}`).get();
@@ -43,7 +43,7 @@ export async function GET() {
     }),
     ttlCache("delivery-zones", 60_000, async (): Promise<ZoneRow[]> => {
       try {
-        const snap = await adminDb().collection("delivery_zones").where("active", "==", 1).get();
+        const snap = await (await adminDb()).collection("delivery_zones").where("active", "==", 1).get();
         const rows = snap.docs
           .map((d) => {
             const v = d.data();
