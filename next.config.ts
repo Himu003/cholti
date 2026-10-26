@@ -25,6 +25,11 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   serverExternalPackages: ["jose", "jwks-rsa"],
+  turbopack: {
+    resolveAlias: {
+      "firebase/firestore": "firebase/firestore/lite",
+    },
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
