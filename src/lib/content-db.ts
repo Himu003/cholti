@@ -1,26 +1,7 @@
+import { adminDb } from "./firebase-admin";
 import { ttlCache } from "./ttl-cache";
 
-type Firestore = import("firebase-admin/firestore").Firestore;
-
 const UPLOADS_BASE = process.env.ADMIN_PUBLIC_URL ?? "http://localhost:3001";
-
-let cached: Firestore | null = null;
-
-async function fsdb(): Promise<Firestore> {
-  if (!cached) {
-    const { initializeApp, getApps, cert } = await import("firebase-admin/app");
-    const { getFirestore } = await import("firebase-admin/firestore");
-    if (!getApps().length) {
-      const inline = process.env.FIREBASE_SERVICE_ACCOUNT;
-      const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-      if (inline) initializeApp({ credential: cert(JSON.parse(inline)) });
-      else if (keyFile) initializeApp({ credential: cert(keyFile) });
-      else throw new Error("Firebase credentials are not set");
-    }
-    cached = getFirestore();
-  }
-  return cached;
-}
 
 export type BrandContent = {
   title_en: string;
@@ -69,7 +50,7 @@ function strList(v: unknown): string[] {
 export async function getBrand(): Promise<BrandContent> {
   return ttlCache("content:brand", 60_000, async () => {
     try {
-      const snap = await (await fsdb()).doc("content/brand").get();
+      const snap = await (await adminDb()).doc("content/brand").get();
       if (!snap.exists) throw new Error("no brand");
       const v = snap.data() ?? {};
       return {
@@ -90,7 +71,7 @@ export async function getBrand(): Promise<BrandContent> {
 export async function getAbout(): Promise<AboutContent> {
   return ttlCache("content:about", 60_000, async () => {
     try {
-      const snap = await (await fsdb()).doc("content/about").get();
+      const snap = await (await adminDb()).doc("content/about").get();
       if (!snap.exists) throw new Error("no about");
       const v = snap.data() ?? {};
       return {

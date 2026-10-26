@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import ImageKit from "imagekit";
 import { adminAuth } from "@/lib/firebase-admin";
 
 export const runtime = "nodejs";
@@ -32,16 +31,23 @@ export async function POST(req: Request) {
   if (!ext) return NextResponse.json({ error: "Only jpg, png or webp" }, { status: 400 });
 
   try {
-    const up = await new ImageKit({
-      publicKey: process.env.IMAGEKIT_PUBLIC_KEY ?? "",
-      privateKey: process.env.IMAGEKIT_PRIVATE_KEY ?? "",
-      urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT ?? "",
-    }).upload({
-      file: buf,
-      fileName: `profile-${Date.now()}.${ext}`,
-      folder: `cholti/shop/avatars/${uid}`,
-      useUniqueFileName: false,
+    const publicKey = process.env.IMAGEKIT_PUBLIC_KEY ?? "";
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY ?? "";
+    if (!publicKey || !privateKey) throw new Error("ImageKit credentials are not set");
+    const fileName = `profile-${Date.now()}.${ext}`;
+    const form = new FormData();
+    form.append("file", file, fileName);
+    form.append("fileName", fileName);
+    form.append("folder", `cholti/shop/avatars/${uid}`);
+    form.append("useUniqueFileName", "false");
+    const res = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
+      method: "POST",
+      headers: { Authorization: `Basic ${btoa(`${publicKey}:${privateKey}`)}` },
+      body: form,
     });
+    if (!res.ok) throw new Error(`ImageKit upload failed: ${res.status}`);
+    const up = (await res.json()) as { url?: string };
+    if (!up.url) throw new Error("ImageKit returned no url");
     return NextResponse.json({ url: up.url });
   } catch {
     return NextResponse.json({ error: "Upload failed" }, { status: 502 });

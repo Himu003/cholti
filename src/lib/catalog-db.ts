@@ -1,27 +1,9 @@
 import { PRODUCTS, CATEGORIES, REVIEWS, type Product } from "./data";
+import { adminDb } from "./firebase-admin";
 import { ttlCache } from "./ttl-cache";
-
-type Firestore = import("firebase-admin/firestore").Firestore;
+import type { FsDocData } from "./firestore-rest";
 
 const UPLOADS_BASE = process.env.ADMIN_PUBLIC_URL ?? "http://localhost:3001";
-
-let cached: Firestore | null = null;
-
-async function fsdb(): Promise<Firestore> {
-  if (!cached) {
-    const { initializeApp, getApps, cert } = await import("firebase-admin/app");
-    const { getFirestore } = await import("firebase-admin/firestore");
-    if (!getApps().length) {
-      const inline = process.env.FIREBASE_SERVICE_ACCOUNT;
-      const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-      if (inline) initializeApp({ credential: cert(JSON.parse(inline)) });
-      else if (keyFile) initializeApp({ credential: cert(keyFile) });
-      else throw new Error("Firebase credentials are not set");
-    }
-    cached = getFirestore();
-  }
-  return cached;
-}
 
 export type ShopCategory = { id: string; name: string; bn: string; img: string; count: string; badge?: string };
 export type ShopSub = { id: string; cat: string; name: string; bn: string; img: string; count: string; badge?: string };
@@ -39,7 +21,7 @@ function strArr(v: unknown): string[] {
   return Array.isArray(v) ? (v as unknown[]).filter((x): x is string => typeof x === "string") : [];
 }
 
-function toProduct(id: string, v: FirebaseFirestore.DocumentData): Product {
+function toProduct(id: string, v: FsDocData): Product {
   const rawImgs = Array.isArray(v.imgs) && v.imgs.length ? v.imgs : [String(v.img ?? "")];
   const imgs = (rawImgs as string[]).map((s) => (s.trim() ? absolutize(s.trim()) : DEFAULT_CAT_IMG.replace("w=400", "w=800")));
   return {
@@ -63,7 +45,7 @@ function toProduct(id: string, v: FirebaseFirestore.DocumentData): Product {
   };
 }
 
-function toCategory(id: string, v: FirebaseFirestore.DocumentData): ShopCategory {
+function toCategory(id: string, v: FsDocData): ShopCategory {
   const img = String(v.img ?? "").trim();
   return {
     id,
@@ -75,7 +57,7 @@ function toCategory(id: string, v: FirebaseFirestore.DocumentData): ShopCategory
   };
 }
 
-function toSub(id: string, v: FirebaseFirestore.DocumentData): ShopSub {
+function toSub(id: string, v: FsDocData): ShopSub {
   const img = String(v.img ?? "").trim();
   return {
     id,
@@ -88,13 +70,13 @@ function toSub(id: string, v: FirebaseFirestore.DocumentData): ShopSub {
   };
 }
 
-function toReview(v: FirebaseFirestore.DocumentData): ShopReview {
+function toReview(v: FsDocData): ShopReview {
   return { t: String(v.text ?? ""), n: String(v.name ?? ""), a: String(v.area ?? "") };
 }
 
 async function activeDocs(collection: string) {
   return ttlCache(`active:${collection}`, 60_000, async () => {
-    const snap = await (await fsdb()).collection(collection).where("active", "==", 1).get();
+    const snap = await (await adminDb()).collection(collection).where("active", "==", 1).get();
     return snap.docs
       .map((d) => ({ order: Number(d.data().sort_order ?? 0), doc: d }))
       .sort((a, b) => a.order - b.order)
@@ -173,7 +155,7 @@ const FALLBACK_SIZES: Record<string, string[]> = {
 async function optionOn(kind: "fabrics" | "sizes" | "colors"): Promise<boolean> {
   return ttlCache(`options:vis:${kind}`, 60_000, async () => {
     try {
-      const snap = await (await fsdb()).doc("config/options").get();
+      const snap = await (await adminDb()).doc("config/options").get();
       return (snap.data() ?? {})[kind] !== false;
     } catch {
       return true;

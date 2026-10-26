@@ -1,27 +1,8 @@
 import { BANNER_SLIDES, HERO_STYLE, type BannerSlide, type HeroStyle } from "./hero";
+import { adminDb } from "./firebase-admin";
 import { ttlCache } from "./ttl-cache";
 
-type Firestore = import("firebase-admin/firestore").Firestore;
-
 const UPLOADS_BASE = process.env.ADMIN_PUBLIC_URL ?? "http://localhost:3001";
-
-let cached: Firestore | null = null;
-
-async function fsdb(): Promise<Firestore> {
-  if (!cached) {
-    const { initializeApp, getApps, cert } = await import("firebase-admin/app");
-    const { getFirestore } = await import("firebase-admin/firestore");
-    if (!getApps().length) {
-      const inline = process.env.FIREBASE_SERVICE_ACCOUNT;
-      const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-      if (inline) initializeApp({ credential: cert(JSON.parse(inline)) });
-      else if (keyFile) initializeApp({ credential: cert(keyFile) });
-      else throw new Error("Firebase credentials are not set");
-    }
-    cached = getFirestore();
-  }
-  return cached;
-}
 
 type HeroPayload = { style: HeroStyle; slides: BannerSlide[] };
 
@@ -66,7 +47,7 @@ function inWindow(starts: unknown, ends: unknown, t: string) {
 export async function getHero(): Promise<HeroPayload> {
   return ttlCache("hero", 60_000, async () => {
   try {
-    const db = await fsdb();
+    const db = await adminDb();
     const [cfg, snap] = await Promise.all([
       db.doc("hero_config/main").get(),
       db.collection("hero_slides").where("active", "==", 1).get(),

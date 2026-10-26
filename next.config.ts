@@ -25,14 +25,6 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   serverExternalPackages: ["jose", "jwks-rsa"],
-  turbopack: {
-    resolveAlias: {
-      "firebase-admin/app": "./src/lib/firebase-admin-worker-stub.ts",
-      "firebase-admin/firestore": "./src/lib/firebase-admin-worker-stub.ts",
-      "firebase-admin/auth": "./src/lib/firebase-admin-worker-stub.ts",
-      "firebase/firestore": "firebase/firestore/lite",
-    },
-  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
