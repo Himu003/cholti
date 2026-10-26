@@ -4,7 +4,7 @@
 	"build": {
 		"command": "npx opennextjs-cloudflare build"
 	},
-	"name": "choltihomedecor34354",
+	"name": "cholti",
 	"compatibility_date": "2026-10-26",
 	"compatibility_flags": [
 		"nodejs_compat",
@@ -22,7 +22,7 @@
 			// Self-reference service binding, the service name must match the worker name
 			// see https://opennext.js.org/cloudflare/caching
 			"binding": "WORKER_SELF_REFERENCE",
-			"service": "choltihomedecor34354"
+			"service": "cholti"
 		}
 	],
 	"images": {

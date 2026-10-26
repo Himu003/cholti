@@ -33,13 +33,6 @@ const nextConfig: NextConfig = {
       "firebase/firestore": "firebase/firestore/lite",
     },
   },
-  allowedDevOrigins: [
-    "3000-cs-100214279862-default.cs-asia-southeast1-yelo.cloudshell.dev",
-    "awvzr-136-85-106-86.run.pinggy-free.link",
-    "zqrfh-136-85-106-86.free.pinggy.net",
-    "*.run.pinggy-free.link",
-    "*.free.pinggy.net",
-  ],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
