@@ -24,6 +24,7 @@ const csp = isDev
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  serverExternalPackages: ["jose", "jwks-rsa"],
   allowedDevOrigins: [
     "3000-cs-100214279862-default.cs-asia-southeast1-yelo.cloudshell.dev",
     "awvzr-136-85-106-86.run.pinggy-free.link",
@@ -56,3 +57,5 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+import('@opennextjs/cloudflare').then(m => m.initOpenNextCloudflareForDev());
